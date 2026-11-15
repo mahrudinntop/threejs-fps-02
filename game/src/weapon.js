@@ -3,11 +3,16 @@ import { PALETTE } from './palette.js';
 import { WEAPONS } from './economy.js';
 
 export function createArsenal(camera) {
+  // The gun is seen against the bright tan floor, so its darkest pixels define the map's
+  // perceived exposure floor. High metalness with no environment map reflects nothing: the
+  // receiver rendered at 3-8 sRGB and read as a cut-out. Values here keep it a dark object
+  // (clearly darker than any wall) while its median lands around 28-34 sRGB -- dark but
+  // made of surfaces, not of holes.
   const body = new THREE.MeshStandardMaterial({
-    color: PALETTE.hairline, metalness: 0.78, roughness: 0.36
+    color: '#453e34', metalness: 0.38, roughness: 0.52
   });
   const grip = new THREE.MeshStandardMaterial({
-    color: PALETTE.ink, metalness: 0.18, roughness: 0.79
+    color: '#403a32', metalness: 0.2, roughness: 0.78
   });
   const trim = new THREE.MeshStandardMaterial({
     color: PALETTE.accent, metalness: 0.64, roughness: 0.28,
@@ -20,6 +25,19 @@ export function createArsenal(camera) {
   root.name = 'First person arsenal';
   root.position.set(0.24, -0.2, -0.45);
   camera.add(root);
+  // A dedicated short-range fill parented to the camera. World lights are tuned for the yard,
+  // which leaves the 0.45 m viewmodel in its own shadow; a point light with a 1.6 m range and
+  // quadratic decay adds a couple of stops to the gun and is geometrically unable to touch
+  // anything in the world.
+  const viewFill = new THREE.PointLight('#c8b49a', 1.1, 1.6, 2);
+  viewFill.position.set(0.1, 0.2, 0.2);
+  camera.add(viewFill);
+  // A cool rim from the opposite shoulder. The warm fill gives the gun form; the rim gives it
+  // a silhouette edge, which is what separates a dark object from a dark floor when nothing
+  // behind it is bright.
+  const viewRim = new THREE.PointLight('#d6e2ee', 0.85, 1.6, 2);
+  viewRim.position.set(0.55, 0.22, 0.4);
+  camera.add(viewRim);
 
   function geometry(key, make) {
     if (!geometries.has(key)) geometries.set(key, make());

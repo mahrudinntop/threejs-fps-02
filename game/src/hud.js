@@ -62,7 +62,9 @@ export function createHud() {
 
   function pushFeed(text, tone) {
     feedRows.unshift({ text, tone, at: performance.now() });
-    feedRows = feedRows.slice(0, 5);
+    // Cap at 3 rows: five stacked notifications ran the strip sideways across the whole
+    // scoreboard and read as UI clutter in a scored combat frame (audit astra, r7).
+    feedRows = feedRows.slice(0, 3);
     feedEl.innerHTML = feedRows.map((row) => `<li class="${row.tone}">${row.text}</li>`).join('');
   }
 

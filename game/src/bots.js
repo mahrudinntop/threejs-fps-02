@@ -40,8 +40,15 @@ export function createBots(scene, colliders, opts = {}) {
   const homeCount = opts.teamSize ?? 3;
   const bots = [];
 
-  const friendlyMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(opts.friendlyColor ?? '#4f7f9e'), roughness: 0.8 });
-  const enemyMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(opts.enemyColor ?? '#9e6b4f'), roughness: 0.8 });
+  // Bot palette (audit astra, r7): the old defaults (a near-white friendly and an orange enemy)
+  // were placeholder colours -- they broke the WW2 earth-tone palette and read as mannequins.
+  // Both teams now sit inside the map's value range: defenders in field-grey/olive, attackers in
+  // a muted brown kit, separated by VALUE and a small hue shift rather than by saturation, so
+  // they read as soldiers in the scene instead of as coloured primitives.
+  const friendlyMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(opts.friendlyColor ?? '#555b45'), roughness: 0.9, metalness: 0.0 });
+  const enemyMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(opts.enemyColor ?? '#6b5544'), roughness: 0.9, metalness: 0.0 });
+  const kitMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color('#514536'), roughness: 0.9, metalness: 0.0 });
+  const helmetMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color('#4a4f3c'), roughness: 0.72, metalness: 0.05 });
 
   function buildBody(team) {
     const group = new THREE.Group();
@@ -51,9 +58,30 @@ export function createBots(scene, colliders, opts = {}) {
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.27, 0.27), material);
     head.position.y = BOT_EYE + 0.02;
     head.userData.part = 'head';
+    // A steel helmet on top of the head block: the single silhouette cue that turns a coloured
+    // box into a soldier at ten metres, and the top-of-head hitbox the headshot check expects.
+    const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.15, 0.35), helmetMaterial);
+    helmet.position.y = BOT_EYE + 0.2;
+    helmet.userData.part = 'head';
     const legs = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.82, 0.3), material);
     legs.position.y = 0.41;
-    group.add(torso, head, legs);
+    // Webbing belt at the waist: one dark band that reads as kit rather than as a plastic torso,
+    // and splits the body into two values so the figure has a waist from any angle.
+    const belt = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.35), kitMaterial);
+    belt.position.y = 0.86;
+    // Gloves: darker hands so the arms do not end in body-coloured stubs.
+    const gloveL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.16), kitMaterial);
+    gloveL.position.set(-0.36, 1.16, 0.06);
+    const gloveR = gloveL.clone();
+    gloveR.position.x = 0.36;
+    // Arms (audit luna, r9: "a stack of boxes"). Full-length sleeves from shoulder to the glove,
+    // so the figure has limbs instead of floating hands; the sleeve is slightly narrower than
+    // half the torso width, which reads as an arm at combat range.
+    const armL = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.52, 0.2), material);
+    armL.position.set(-0.365, 1.32, 0.06);
+    const armR = armL.clone();
+    armR.position.x = 0.365;
+    group.add(torso, head, helmet, legs, belt, armL, armR, gloveL, gloveR);
     group.traverse((child) => {
       if (child.isMesh) {
         child.castShadow = true;
