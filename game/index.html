@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ashgrove Yard — a tactical round-based FPS in three.js</title>
+<link rel="stylesheet" href="./style.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.min.js",
+    "three/": "./vendor/three/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud">
+  <div id="hud-top">
+    <div class="hud-panel" id="hud-score-panel">
+      <span class="label">Rounds</span>
+      <span id="hud-score">0 : 0</span>
+    </div>
+    <div class="hud-panel" id="hud-clock-panel">
+      <span class="label">Clock</span>
+      <span id="hud-timer">01:35</span>
+    </div>
+    <div class="hud-panel" id="hud-round-panel">
+      <span id="hud-round">Round 1 / 9</span>
+    </div>
+  </div>
+
+  <div id="hud-objective">Buy phase: press 1-4 to buy, Esc to deploy</div>
+  <div id="round-banner" class="banner"></div>
+  <div id="hud-center" class="hitmarker"></div>
+  <div id="hud-hurt"></div>
+
+  <ul id="hud-feed"></ul>
+
+  <div id="hud-bottom">
+    <div class="hud-panel" id="hud-health-panel">
+      <span class="label">Health</span>
+      <span id="hud-health">100</span>
+    </div>
+    <div class="hud-panel" id="hud-economy-panel">
+      <span class="label">Credits</span>
+      <span id="hud-credits">$800</span>
+      <span id="hud-weapon">Lark P9</span>
+      <span id="hud-grenades">Flare 1</span>
+    </div>
+    <div class="hud-panel" id="hud-ammo-panel">
+      <span class="label">Ammo</span>
+      <span id="hud-ammo">12 / 48</span>
+    </div>
+  </div>
+
+  <ul id="buy" class="hidden"></ul>
+</div>
+
+<div id="overlay">
+  <div class="overlay-card">
+    <h1>Ashgrove Yard</h1>
+    <p id="overlay-title">Round 1 of 9: plant the charge or stop them</p>
+    <p id="overlay-body">WASD to move, mouse to aim, click to fire, R to reload, E to plant, B to buy, C to crouch.</p>
+    <p id="overlay-hint">Click to play</p>
+    <button id="play-button">Play</button>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
