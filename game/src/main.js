@@ -394,6 +394,11 @@ function step(dt) {
 }
 
 let steady = 0;
+// How long settling to full accuracy takes, in seconds: short enough to feel responsive,
+// long enough that snap-turns never get the bonus for free.
+const STEADY_TIME = 0.34;
+// How much of the movement spread penalty settling removes at full steadiness.
+const STEADY_FRACTION = 0.45;
 
 function frame(now) {
   requestAnimationFrame(frame);
@@ -402,10 +407,10 @@ function frame(now) {
   if (!frozen) {
     const look = input.takeLook();
     player.look(look.x, look.y);
-    if (input.state.firing && arsenal.ready()) shoot(shot ? 0 : arsenal.spread(player.groundSpeed()) * (1 - 0.45 * steady));
+    if (input.state.firing && arsenal.ready()) shoot(shot ? 0 : arsenal.spread(player.groundSpeed()) * (1 - STEADY_FRACTION * steady));
     // Steady-aim: spread tightens as the player holds still, eased in over a third of a second so
     // it reads as settling rather than a switch. Standing to aim is the patient way to fight.
-    steady = Math.min(1, steady + dt / 0.34);
+    steady = Math.min(1, steady + dt / STEADY_TIME);
     if (input.state.keys.has('KeyR')) { if (arsenal.reload()) audio.reload('out'); }
     const speed = player.groundSpeed();
     // Moving at any real speed gives the steady bonus back, so the reward is specifically for
