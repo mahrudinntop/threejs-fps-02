@@ -393,6 +393,8 @@ function step(dt) {
   }
 }
 
+let steady = 0;
+
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min((now - lastTime) / 1000, 0.1);
@@ -400,9 +402,15 @@ function frame(now) {
   if (!frozen) {
     const look = input.takeLook();
     player.look(look.x, look.y);
-    if (input.state.firing && arsenal.ready()) shoot(shot ? 0 : arsenal.spread(player.groundSpeed()));
+    if (input.state.firing && arsenal.ready()) shoot(shot ? 0 : arsenal.spread(player.groundSpeed()) * (1 - 0.45 * steady));
+    // Steady-aim: spread tightens as the player holds still, eased in over a third of a second so
+    // it reads as settling rather than a switch. Standing to aim is the patient way to fight.
+    steady = Math.min(1, steady + dt / 0.34);
     if (input.state.keys.has('KeyR')) { if (arsenal.reload()) audio.reload('out'); }
     const speed = player.groundSpeed();
+    // Moving at any real speed gives the steady bonus back, so the reward is specifically for
+    // stopping to aim rather than accumulating while running.
+    if (speed > 0.8) steady = Math.max(0, steady - dt * 3.2);
     if (speed > 1.2) {
       footT += dt;
       const interval = speed > 4 ? 0.32 : 0.46;
