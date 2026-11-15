@@ -12,6 +12,8 @@ import { createBots } from './bots.js';
 import { createHud } from './hud.js';
 import { createEconomy, WEAPONS } from './economy.js';
 import { createObjective } from './objective.js';
+import { createEffects, createCasingPool } from './effects.js';
+import { createAudio } from './audio.js';
 
 const FIXED_STEP = 1 / 60;
 const ROUND_SECONDS = 95;
@@ -38,13 +40,33 @@ const random = mulberry32(seed);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+// Filmic roll-off: a hot sun only works if the bright side compresses instead of clipping to
+// white, so the lit face keeps its plaster tone while the shadow side falls to real darkness.
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 document.getElementById('game').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(PALETTE.canvas);
-scene.fog = new THREE.Fog(new THREE.Color(PALETTE.canvas), 22, 54);
+// The sky band: the horizon the walls sit against, and the fog that softens the far lane
+// instead of the flat wall-colour that used to erase the whole distance.
+// A graded sky: a vertical canvas gradient from horizon haze to a deeper zenith, so the
+// background reads as sky rather than a viewport fill, and the fog blends the far lane into it.
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 4;
+skyCanvas.height = 256;
+const skyCtx = skyCanvas.getContext('2d');
+const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 256);
+skyGrad.addColorStop(0, '#9db4cc');
+skyGrad.addColorStop(0.55, '#c6d3e2');
+skyGrad.addColorStop(1, '#e3e7ea');
+skyCtx.fillStyle = skyGrad;
+skyCtx.fillRect(0, 0, 4, 256);
+const skyTexture = new THREE.CanvasTexture(skyCanvas);
+skyTexture.colorSpace = THREE.SRGBColorSpace;
+scene.background = skyTexture;
+scene.fog = new THREE.Fog(new THREE.Color('#c9d4e0'), 30, 68);
 const camera = new THREE.PerspectiveCamera(76, window.innerWidth / window.innerHeight, 0.05, 150);
 scene.add(camera);
 
@@ -56,6 +78,19 @@ const bots = createBots(scene, world.colliders, { seed, teamSize: TEAM_SIZE });
 const hud = createHud();
 const economy = createEconomy();
 const objective = createObjective(SITE.center, SITE.radius);
+const effects = createEffects(scene, camera);
+// A camera-parented fill: a small cool light that rides with the viewmodel, so the weapon never
+// silhouettes into a shapeless black mass against a dark wall -- the cheapest read on the
+// first-person scale, and the reason the rifle is legible in every frame.
+const viewFill = new THREE.PointLight(new THREE.Color('#cdd8e4'), 1.1, 2.4);
+viewFill.position.set(0.35, -0.28, -0.4);
+camera.add(viewFill);
+// The viewmodel casts no shadow: a first-person weapon held 40 cm from the eye throws a long
+// smear that reads as a bug, never as light. Everything the player sees in the world still casts.
+camera.traverse((object) => { if (object.isMesh) object.castShadow = false; });
+scene.add(camera);
+const casings = createCasingPool(scene);
+const audio = createAudio();
 
 const raycaster = new THREE.Raycaster();
 raycaster.far = 90;
@@ -81,6 +116,7 @@ let elapsed = 0;
 let frozen = false;
 let started = false;
 let accumulator = 0;
+let footT = 0;
 let lastTime = performance.now();
 
 function lineOfSight(from, to) {
@@ -123,6 +159,8 @@ function resetRound(withBuyMenu) {
   arsenal.refill();
   arsenal.equip(arsenal.state.id, economy.state.grenades);
   objective.reset();
+  effects.reset();
+  casings.reset();
   bots.reset(TEAM_SIZE - 1);
   hud.setScore(match.playerScore, match.enemyScore);
   hud.setRound(match.round, ROUNDS_TO_WIN * 2 - 1);
@@ -231,6 +269,7 @@ function shoot(spread) {
     const killed = bots.damage(bot, dealt);
     score += killed ? 100 : 10;
     hud.hitMarker(killed, 90);
+    if (killed) audio.kill(); else audio.hit(head);
     if (killed) {
       hud.pushFeed(`${head ? 'Headshot' : 'Kill'} on a Defender (${roundValue()}/10 this round)`, 'good');
     } else {
@@ -238,6 +277,21 @@ function shoot(spread) {
     }
   }
   arsenal.pullTrigger();
+  audio.shot(gun.name && gun.id ? gun.id : 'rifle');
+  const muzzlePoint = camera.position.clone().add(direction.clone().multiplyScalar(0.55));
+  muzzlePoint.y -= 0.16;
+  effects.muzzle(muzzlePoint, PALETTE.accent);
+  if (hit) {
+    effects.tracer(muzzlePoint, hit.point, 0xffd9a8);
+    if (hit.object.userData.bot) {
+      effects.impact(hit.point, direction.clone().negate(), 'flesh');
+    } else {
+      effects.impact(hit.point, hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : direction.clone().negate(), hit.point.y < 0.35 ? 'ground' : 'wall');
+    }
+  } else {
+    effects.tracer(muzzlePoint, camera.position.clone().add(direction.clone().multiplyScalar(40)), 0xffd9a8);
+  }
+  casings.eject(muzzlePoint.set(camera.position.x, camera.position.y - 0.12, camera.position.z), new THREE.Vector3(1.1 + random() * 0.6, 1.4 + random() * 0.5, 0.3), 0);
   player.recoil(0.009 + random() * 0.006, (random() * 2 - 1) * 0.005);
   syncHud();
   return true;
@@ -250,6 +304,8 @@ function throwGrenade() {
   camera.getWorldDirection(direction);
   boom.position.addScaledVector(direction, 4.5);
   scene.add(boom);
+  effects.explosion(boom.position.clone(), 5.2);
+  audio.explosion();
   hud.pushFeed('Flare thrown', 'neutral');
   let caught = 0;
   for (const bot of bots.bots) {
@@ -271,6 +327,8 @@ function step(dt) {
   elapsed += dt;
   player.step(dt, input.state.keys);
   arsenal.step(dt);
+  effects.update(dt);
+  casings.update(dt);
   match.clock = Math.max(0, match.clock - dt);
 
   if (input.state.weaponKey) {
@@ -288,6 +346,7 @@ function step(dt) {
       if (random() < chance) {
         body.health = Math.max(0, body.health - damage);
         hud.hurt();
+        audio.hurt();
         syncHud();
         if (body.health <= 0 && match.phase === 'live') endRound(false, 'You were shot');
       }
@@ -342,7 +401,15 @@ function frame(now) {
     const look = input.takeLook();
     player.look(look.x, look.y);
     if (input.state.firing && arsenal.ready()) shoot(shot ? 0 : arsenal.spread(player.groundSpeed()));
-    if (input.state.keys.has('KeyR')) arsenal.reload();
+    if (input.state.keys.has('KeyR')) { if (arsenal.reload()) audio.reload('out'); }
+    const speed = player.groundSpeed();
+    if (speed > 1.2) {
+      footT += dt;
+      const interval = speed > 4 ? 0.32 : 0.46;
+      if (footT >= interval) { footT = 0; audio.step('floor'); }
+    } else {
+      footT = 0.2;
+    }
     accumulator += dt;
     let steps = 0;
     while (accumulator >= FIXED_STEP && steps < 5) {
@@ -368,12 +435,47 @@ function runShot(name) {
   body.yaw = 0;
   match.phase = 'buy';
   match.clock = BUY_SECONDS;
+  if (name === 'fight') {
+    // A capture of the fight itself: mid-round, a defender in the open and the ammo low.
+    economy.buy('rifle');
+    arsenal.equip('rifle', 1);
+    match.phase = 'live';
+    match.clock = ROUND_SECONDS - 41;
+    // Stand in the sun on the east lane mouth: the mid pillars, the site glow and two
+    // defenders all sit ahead, and the floor underfoot is lit rather than wall-shadowed.
+    body.position.set(7.0, 0, 6.2);
+    body.health = 62;
+    settle(30);
+    // Face the site so the lane, the pillars and the defenders all sit in one frame.
+    aimAt(new THREE.Vector3(1.8, 1.2, -1.6));
+    for (let index = 0; index < 4; index += 1) {
+      const bot = bots.bots[index % bots.bots.length];
+      if (bot && bot.alive) {
+        aimAt(new THREE.Vector3(bot.position.x, 1.35, bot.position.z));
+        settle(3);
+        shoot(0);
+        settle(11);
+      }
+    }
+    hud.setScore(2, 1);
+    hud.setRound(3, 9);
+    hud.setObjective('Charge active: keep them off it', true);
+    hud.pushFeed('You killed a Defender (head)', 'good');
+    hud.pushFeed('A Defender is holding mid', 'neutral');
+    hud.pushFeed('Charge planted at A', 'good');
+    settle(6);
+    syncHud();
+    paintTwiceThenReady();
+    return;
+  }
   if (name === 'play' || name === 'end') {
     economy.buy('rifle');
     arsenal.equip('rifle', 2);
     match.phase = 'live';
     match.clock = ROUND_SECONDS - 28;
-    body.position.set(1.4, 0, 4.2);
+    // Play: from the attacker spawn the whole map axis is in frame -- mid pillars, the site
+    // plate with its glowing charge, the lane walls and the skyline beyond the perimeter.
+    body.position.set(0.8, 0, 10.6);
     settle(30);
     for (let index = 0; index < bots.bots.length; index += 1) {
       const bot = bots.bots[index];
@@ -389,7 +491,7 @@ function runShot(name) {
       hud.setOverlay('Round won', 'Charge detonated', 'Click to play again', 'tone-good');
       settle(40);
     } else {
-      body.position.set(-2.0, 0, -1.2);
+      body.position.set(-3.6, 0, -1.8);
       settle(14);
       aimAt(new THREE.Vector3(SITE.center.x, 1.2, SITE.center.z));
       hud.setObjective('Charge active: keep them off it', true);
@@ -397,9 +499,11 @@ function runShot(name) {
       settle(2);
     }
   } else {
-    body.position.set(0, 0, 9.2);
+    // Start: stand between the lane mouths looking up the yard, so the frame shows a lane
+    // receding, the mid pillars and the site beyond -- a composed view, not a flat corner.
+    body.position.set(-5.2, 0, 10.4);
     settle(24);
-    aimAt(new THREE.Vector3(SITE.center.x, 1.4, SITE.center.z));
+    aimAt(new THREE.Vector3(-1.6, 1.15, -4.0));
     hud.setScore(0, 0);
     hud.setRound(1, 9);
     hud.showBuy(economy.state.credits, economy.state.owned);
@@ -431,6 +535,7 @@ hud.setRound(1, ROUNDS_TO_WIN * 2 - 1);
 hud.setHealth(100);
 hud.setTimer(BUY_SECONDS);
 hud.onPlay(() => {
+  audio.unlock();
   if (shot) return;
   if (match.over) {
     match.over = false;

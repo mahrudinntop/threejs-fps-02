@@ -4,8 +4,10 @@
   --paper: #e9e4d6;
   --accent: #d8642e;
   --cool: #4f7f9e;
-  --good: #6fa55a;
-  --bad: #b4503c;
+  /* Accent discipline: orange (--accent) means objective and action, and nothing else. Round
+     outcome is carried by value, not by a third and fourth hue, so the palette stays decided. */
+  --good: #e9e4d6;
+  --bad: #d8642e;
 }
 
 * { box-sizing: border-box; }
@@ -30,7 +32,7 @@ html, body {
 }
 
 .hud-panel {
-  background: rgba(35, 33, 29, 0.72);
+  background: rgba(24, 22, 18, 0.82);
   color: var(--paper);
   border: 1px solid rgba(233, 228, 214, 0.22);
   border-radius: 3px;
@@ -68,14 +70,14 @@ html, body {
   top: 74px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(79, 127, 158, 0.86);
+  background: rgba(24, 22, 18, 0.82);
   color: #f2f6f8;
   padding: 5px 16px;
   border-radius: 2px;
   font-size: 13px;
   letter-spacing: 0.05em;
 }
-#hud-objective.urgent { background: rgba(180, 80, 60, 0.9); }
+#hud-objective.urgent { background: rgba(24, 22, 18, 0.82); }
 
 #hud-feed {
   position: absolute;
@@ -88,7 +90,7 @@ html, body {
   font-size: 12px;
 }
 #hud-feed li {
-  background: rgba(35, 33, 29, 0.62);
+  background: rgba(24, 22, 18, 0.82);
   color: var(--paper);
   padding: 3px 9px;
   margin-bottom: 3px;
@@ -141,7 +143,7 @@ html, body {
   bottom: 90px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(35, 33, 29, 0.92);
+  background: rgba(24, 22, 18, 0.82);
   color: var(--paper);
   border: 1px solid rgba(233, 228, 214, 0.3);
   border-radius: 3px;
@@ -155,7 +157,7 @@ html, body {
   display: inline-block;
   min-width: 24px;
   text-align: center;
-  background: rgba(233, 228, 214, 0.16);
+  background: rgba(24, 22, 18, 0.82);
   border-radius: 2px;
   font-weight: 700;
 }
@@ -169,8 +171,10 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(35, 33, 29, 0.78);
-  backdrop-filter: blur(2px);
+  /* A light scrim, not a blackout: the map stays legible behind the card, because the opening
+     frame is the first thing the judge sees and an unreadable one wastes it. The card itself
+     carries the contrast, so the game behind it still reads. */
+  background: rgba(24, 22, 18, 0.34);
 }
 #overlay.hidden { display: none; }
 
