@@ -94,6 +94,22 @@ function lineOfSight(from, to) {
   return hits.length === 0;
 }
 
+// A round is scored out of ten: winning the round is worth five, every defender you put down
+// adds one, and the buy phase announces what the round is worth before it starts.
+function roundValue() {
+  const kills = bots.bots.filter((bot) => !bot.alive).length;
+  return Math.min(10, 5 + kills);
+}
+
+function roundBanner() {
+  const lost = match.playerScore < match.enemyScore;
+  hud.pushFeed(
+    `Round ${match.round} — you ${match.playerScore} : ${match.enemyScore} them${lost ? ' (behind)' : ''}`,
+    lost ? 'bad' : 'good',
+  );
+  hud.pushFeed(`Banked $${economy.state.credits} for the buy phase`, 'neutral');
+}
+
 function resetRound(withBuyMenu) {
   match.phase = withBuyMenu ? 'buy' : 'live';
   match.clock = withBuyMenu ? BUY_SECONDS : ROUND_SECONDS;
@@ -112,7 +128,8 @@ function resetRound(withBuyMenu) {
   hud.setRound(match.round, ROUNDS_TO_WIN * 2 - 1);
   if (withBuyMenu) {
     hud.showBuy(economy.state.credits, economy.state.owned);
-    hud.setObjective('Buy phase: press 1-4 to buy, Esc to deploy', false);
+    hud.setObjective(`Buy phase: 10 points on the line, press 1-4 to buy`, false);
+    roundBanner();
   } else {
     hud.hideBuy();
     hud.setObjective('Plant the charge at the site', false);
@@ -124,22 +141,24 @@ function endRound(won, reason) {
   if (match.phase === 'ended' || match.over) return;
   match.phase = 'ended';
   match.clock = 4;
+  const points = won ? roundValue() : Math.min(5, bots.bots.filter((bot) => !bot.alive).length);
   if (won) {
     match.playerScore += 1;
     hud.flash('good');
-    hud.pushFeed(reason, 'good');
+    hud.pushFeed(`${reason} (+${points} pts)`, 'good');
   } else {
     match.enemyScore += 1;
     hud.flash('bad');
-    hud.pushFeed(reason, 'bad');
+    hud.pushFeed(`${reason} (${points} pts for kills)`, 'bad');
   }
+  score += points;
   economy.settleRound(won);
   hud.setScore(match.playerScore, match.enemyScore);
   if (match.playerScore >= ROUNDS_TO_WIN || match.enemyScore >= ROUNDS_TO_WIN) {
     match.over = true;
     hud.setOverlay(
       match.playerScore >= ROUNDS_TO_WIN ? 'Match won' : 'Match lost',
-      `${match.playerScore} : ${match.enemyScore}`,
+      `${match.playerScore} : ${match.enemyScore} — ${score} points`,
       'Click to play again',
       match.playerScore >= ROUNDS_TO_WIN ? 'tone-good' : 'tone-bad',
     );
@@ -208,10 +227,15 @@ function shoot(spread) {
   if (hit && hit.object.userData.bot) {
     const bot = hit.object.userData.bot;
     const head = hit.object.userData.part === 'head';
-    const killed = bots.damage(bot, head ? gun.headDamage : gun.damage);
+    const dealt = head ? gun.headDamage : gun.damage;
+    const killed = bots.damage(bot, dealt);
     score += killed ? 100 : 10;
     hud.hitMarker(killed, 90);
-    if (killed) hud.pushFeed(`${head ? 'Headshot' : 'Kill'} on a Defender`, 'good');
+    if (killed) {
+      hud.pushFeed(`${head ? 'Headshot' : 'Kill'} on a Defender (${roundValue()}/10 this round)`, 'good');
+    } else {
+      hud.pushFeed(`Hit a Defender for ${Math.round(dealt)}${head ? ' (head)' : ''}`, 'good');
+    }
   }
   arsenal.pullTrigger();
   player.recoil(0.009 + random() * 0.006, (random() * 2 - 1) * 0.005);
@@ -227,14 +251,17 @@ function throwGrenade() {
   boom.position.addScaledVector(direction, 4.5);
   scene.add(boom);
   hud.pushFeed('Flare thrown', 'neutral');
+  let caught = 0;
   for (const bot of bots.bots) {
     if (!bot.alive) continue;
     const distance = bot.position.distanceTo(boom.position);
     if (distance < 5.2) {
       const killed = bots.damage(bot, 58);
+      caught += 1;
       if (killed) score += 100;
     }
   }
+  if (caught > 0) hud.pushFeed(`Flare caught ${caught} Defender${caught > 1 ? 's' : ''}`, 'good');
   economy.state.grenades = arsenal.state.grenades;
   syncHud();
   window.setTimeout(() => scene.remove(boom), 180);
@@ -274,6 +301,7 @@ function step(dt) {
     match.clock = ROUND_SECONDS;
     hud.hideBuy();
     hud.setObjective('Plant the charge at the site', false);
+    hud.pushFeed('Buy phase over — round is live', 'neutral');
   }
 
   if (match.phase === 'live') {
@@ -375,7 +403,7 @@ function runShot(name) {
     hud.setScore(0, 0);
     hud.setRound(1, 9);
     hud.showBuy(economy.state.credits, economy.state.owned);
-    hud.setObjective('Buy phase: press 1-4 to buy, Esc to deploy', false);
+    hud.setObjective('Buy phase: 10 points on the line, press 1-4 to buy', false);
     hud.setOverlay('Ashgrove Yard', 'Round 1 of 9: plant the charge or stop them', 'Click to play');
   }
   syncHud();
@@ -409,6 +437,7 @@ hud.onPlay(() => {
     match.round = 1;
     match.playerScore = 0;
     match.enemyScore = 0;
+    score = 0;
     economy.reset();
     resetRound(true);
   }

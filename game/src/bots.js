@@ -67,8 +67,8 @@ export function createBots(scene, colliders, opts = {}) {
     const path = ROUTES[team][route % ROUTES[team].length];
     const start = path[0].clone();
     const offset = (index - 1) * 0.9;
-    start.x += offset;
-    start.z += offset * 0.4;
+    start.x += offset + (random() * 2 - 1) * 0.7;
+    start.z += offset * 0.4 + (random() * 2 - 1) * 0.7;
     const body = buildBody(team);
     body.group.position.copy(start);
     scene.add(body.group);
