@@ -58,18 +58,18 @@ export function createInput(canvas) {
   document.addEventListener('keyup', (event) => {
     state.keys.delete(event.code);
    });
- 
+
    function takeLook() {
      const out = { x: state.look.x, y: state.look.y };
      state.look.x = 0;
      state.look.y = 0;
      return out;
    }
- 
+
    return {
      state,
      takeLook,
      requestLock: () => canvas.requestPointerLock(),
      onLockChange(handler) { listeners.lockChange.push(handler); },
    };
- }
+}

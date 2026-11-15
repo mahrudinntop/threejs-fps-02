@@ -1,10 +1,14 @@
-// A working threejs-fps-01 entry (Node 22, standard library only): the game is this directory's
-// game/ folder, plain static files the browser loads as ES modules with three.js from an import
-// map, and the program hands it in. It copies game/ and screenshots/ from beside this file to
-// /output and writes /output/dossier.json, the summary the judge reads, with the vendored make.fun
-// library. A starting point, not a winner: a grey room, one rifle and four targets that drop when
-// shot. Build your game, put your PNG or JPEG screenshots in screenshots/ (the first by name is
-// the cover) and run it.
+// Ashgrove Yard, a threejs-fps entry (Node 22, standard library only): the game is this
+// directory's game/ folder, plain static files the browser loads as ES modules with three.js
+// from an import map, and this program hands it in. It copies game/ and screenshots/ from
+// beside this file to /output and writes /output/dossier.json, the summary the judge reads,
+// with the vendored make.fun library.
+//
+// The game itself: a compact tactical round-based FPS. Two sides, nine rounds, one site — the
+// attackers carry a charge to the plant point while the defenders hold it. Rounds are won by
+// eliminating the other side or by planting and defusing against a running fuse; between rounds
+// you spend the credits the last round paid you. Everything is procedural geometry and one
+// directional light, so it loads in a second and holds 60 Hz on modest hardware.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
